@@ -36,6 +36,26 @@ def reset_quiz_progress():
         if key.startswith("question_") or key in ["score", "submitted", "q_index", "answers", "bookmarked"]:
             del st.session_state[key]
 
+def shuffle_questions():
+    """Start a fresh quiz attempt with the questions in random order."""
+    current_question_id = None
+    if "question_order" in st.session_state and "q_index" in st.session_state:
+        current_question_id = st.session_state.question_order[st.session_state.q_index]
+
+    new_order = list(range(len(questions)))
+    for _ in range(20):
+        random.shuffle(new_order)
+        if len(new_order) <= 1 or new_order[0] != current_question_id:
+            break
+
+    st.session_state.question_order = new_order
+    reset_quiz_progress()
+    st.session_state.q_index = 0
+    st.session_state.score = 0
+    st.session_state.submitted = False
+    st.session_state.answers = {}
+    st.session_state.bookmarked = set()
+
 # --- Session state setup ---
 if "question_order" not in st.session_state or len(st.session_state.question_order) != len(questions):
     st.session_state.question_order = list(range(len(questions)))
@@ -62,11 +82,7 @@ st.write(q["question"])
 col_shuffle, col_bm, col_jump_input, col_jump_btn = st.columns([1, 1, 1, 1])
 
 with col_shuffle:
-    if st.button("Shuffle MCQs"):
-        st.session_state.question_order = list(range(len(questions)))
-        random.shuffle(st.session_state.question_order)
-        reset_quiz_progress()
-        st.rerun()
+    st.button("Shuffle MCQs", on_click=shuffle_questions)
 
 with col_bm:
     if st.button("🔖 Bookmark"):
