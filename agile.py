@@ -33,7 +33,7 @@ questions = load_questions()
 def reset_quiz_progress():
     """Reset progress and clear previous widget answers."""
     for key in list(st.session_state.keys()):
-        if key.startswith("question_") or key in ["score", "submitted", "q_index", "answers", "bookmarked"]:
+        if (key.startswith("question_") and key != "question_order") or key in ["score", "submitted", "q_index", "answers", "bookmarked"]:
             del st.session_state[key]
 
 def shuffle_questions():
