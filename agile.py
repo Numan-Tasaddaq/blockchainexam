@@ -1,5 +1,6 @@
 import streamlit as st
 import json
+import random
 import re
 
 # --- Normalization helper ---
@@ -29,7 +30,15 @@ def load_questions():
 
 questions = load_questions()
 
+def reset_quiz_progress():
+    """Reset progress and clear previous widget answers."""
+    for key in list(st.session_state.keys()):
+        if key.startswith("question_") or key in ["score", "submitted", "q_index", "answers", "bookmarked"]:
+            del st.session_state[key]
+
 # --- Session state setup ---
+if "question_order" not in st.session_state or len(st.session_state.question_order) != len(questions):
+    st.session_state.question_order = list(range(len(questions)))
 if "q_index" not in st.session_state:
     st.session_state.q_index = 0
 if "score" not in st.session_state:
@@ -43,17 +52,25 @@ if "bookmarked" not in st.session_state:
 
 # --- Display current question ---
 q_index = st.session_state.q_index
-q = questions[q_index]
+question_id = st.session_state.question_order[q_index]
+q = questions[question_id]
 
 st.title(f"Question {q_index + 1} / {len(questions)}")
 st.write(q["question"])
 
-# --- Bookmark + Jump inline layout ---
-col_bm, col_jump_input, col_jump_btn = st.columns([1, 1, 1])
+# --- Practice controls ---
+col_shuffle, col_bm, col_jump_input, col_jump_btn = st.columns([1, 1, 1, 1])
+
+with col_shuffle:
+    if st.button("Shuffle MCQs"):
+        st.session_state.question_order = list(range(len(questions)))
+        random.shuffle(st.session_state.question_order)
+        reset_quiz_progress()
+        st.rerun()
 
 with col_bm:
     if st.button("🔖 Bookmark"):
-        st.session_state.bookmarked.add(q_index)
+        st.session_state.bookmarked.add(question_id)
         st.success("Bookmarked!")
 
 with col_jump_input:
@@ -68,14 +85,14 @@ with col_jump_btn:
 # --- Display answer input ---
 user_answer = None
 if q["type"] == "single":
-    user_answer = st.radio("Choose one:", q["options"], key=f"q{q_index}_single")
+    user_answer = st.radio("Choose one:", q["options"], key=f"question_{question_id}_single")
 elif q["type"] == "multi":
     user_answer = []
     for option in q["options"]:
-        if st.checkbox(option, key=f"{q_index}_{option}"):
+        if st.checkbox(option, key=f"question_{question_id}_{option}"):
             user_answer.append(option)
 elif q["type"] == "blank":
-    user_answer = st.text_input("Enter your answer:", key=f"q{q_index}_input")
+    user_answer = st.text_input("Enter your answer:", key=f"question_{question_id}_input")
 
 # --- Submit & Next side-by-side ---
 col_submit, col_next = st.columns([1, 1])
@@ -84,7 +101,7 @@ with col_submit:
     if st.button("✅ Submit", disabled=st.session_state.submitted):
         st.session_state.submitted = True
         correct = q["correct"] if q["type"] != "blank" else q["answer"]
-        st.session_state.answers[q_index] = user_answer
+        st.session_state.answers[question_id] = user_answer
         if is_correct(user_answer, correct, q["type"]):
             st.success("✅ Correct!")
             st.session_state.score += 1
@@ -115,12 +132,10 @@ if st.session_state.submitted and q_index == len(questions) - 1:
         st.subheader("📌 Review Bookmarked Questions")
         for i in sorted(list(st.session_state.bookmarked)):
             if st.button(f"Review Question {i + 1}", key=f"bmark_{i}"):
-                st.session_state.q_index = i
+                st.session_state.q_index = st.session_state.question_order.index(i)
                 st.session_state.submitted = False
                 st.rerun()
 
     if st.button("🔁 Restart"):
-        for key in list(st.session_state.keys()):
-            if key.startswith("q") or key in ["score", "submitted", "q_index", "answers", "bookmarked"]:
-                del st.session_state[key]
+        reset_quiz_progress()
         st.rerun()
